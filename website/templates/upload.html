@@ -1,0 +1,146 @@
+{% extends "base.html" %} {% block content
+%}
+
+<head>
+  <title>{{ filename }}</title>
+
+  {% for i in range(1, (headers)|length) %}
+  <script>
+    function drawChart{{ i }}() {
+      var filtered_data = new google.visualization.DataTable();
+      {% for header in headers %}
+        {% if loop.index <= 2 %}
+          filtered_data.addColumn({% if loop.index == 2 %}'number'{% else %}'string'{% endif %}, '{{ header|safe }}');
+        {% endif %}
+      {% endfor %}
+      filtered_data.addRows([
+        {% for row in session['filtered_data'] %}
+          ['{{ row[0]|safe }}', {% if row|length > i %}{{ row[i]| float }}{% else %}'0'{% endif %}]{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]);
+    
+      var grouped_data = google.visualization.data.group(
+        filtered_data,
+        [0],
+        [{ column: 1, type: 'number', aggregation: google.visualization.data.avg }]
+      );
+    
+      var options = {
+        chart: {
+          title: 'Average {{ headers[i] }} by {{ headers[0] }}',
+          sortColumn: -1
+        },
+        bars: 'vertical',
+        height: 400,
+        sort: 'disable'
+      };
+    
+      var chart = new google.charts.Bar(document.getElementById('Barchart_div_{{ i }}'));
+      chart.draw(grouped_data, google.charts.Bar.convertOptions(options));
+      console.log(grouped_data.getValue(0, 1));
+    }
+  </script>
+{% endfor %}
+  <script>
+    google.charts.load('current', { 'packages': ['table', 'bar', 'corechart'] });
+    google.charts.setOnLoadCallback(drawTable);
+
+    function drawTable() {
+
+      var data = new google.visualization.DataTable();
+      {% for header in headers %}
+      data.addColumn('string', '{{ header| safe }}');
+      {% endfor %}
+      data.addRows([
+        {% for row in data %}
+    ['{{ row|join("', '")| safe }}'],
+      {% endfor %}
+          ]);
+
+    var table = new google.visualization.Table(document.getElementById('table_div'));
+    table.draw(data, { showRowNumber: true, width: '100%', height: '100%' });
+      }
+</script>
+
+{% for i in range(0, (headers)|length) %}
+  <script>
+    function drawPie{{ i }}() {
+      var filtered_data = new google.visualization.DataTable();
+      {% for header in headers %}
+  filtered_data.addColumn('string', '{{ header|safe }}');
+
+      {% endfor %}
+
+      filtered_data.addRows([
+  {% for row in session['filtered_data'] %}
+    [{% for i in range(row|length) %}'{{ row[i]|safe }}'{% if not loop.last %}, {% endif %}{% endfor %}]
+    {% if not loop.last %},{% endif %}
+  {% endfor %}
+]);
+
+
+      var grouped_data = google.visualization.data.group(
+        filtered_data,
+        [{{i}}],
+        [{ column: {{ i }}, type: 'number', aggregation: google.visualization.data.count }]
+      );
+
+      var options = {
+        title: 'Percentage of {{ headers[i] }}',
+        height: 400,
+        is3D: true,
+        sliceVisibilityThreshold: 0.01,
+      };
+
+      var chart = new google.visualization.PieChart(document.getElementById('Piechart_div_{{ i }}'));
+      chart.draw(grouped_data, options);
+      console.log(grouped_data.getValue(0, 1));
+    }
+  </script>
+{% endfor %}
+
+</head>
+
+<body>
+  <div class="container">
+    <h3>{{ filename }}</h3>
+
+    <form method="POST" action="{{ url_for('views.filter') }}">
+      {% for header in headers %}
+      <input type="checkbox" id="{{ header }}" name="filter" value="{{ header }}">
+        <label for="{{ header }}">{{ header }}</label>
+      {% endfor %}
+      
+      <input class="submit" type="hidden" name="filename" value="{{ filename }}">
+      <br>{% if request.path == url_for('views.filter_page', filename=filename) %}
+    <button type="submit"><a href="{{ url_for('views.upload', user=user, filename=session['filename']) }}">Reset Filters</a></button>
+
+    {% for i in range(0, (headers)|length) %}
+    <button type="button" onclick="drawPie{{ i }}()">{{ headers[i] }} Pie Chart </button>
+    {% endfor %}
+
+    {% for i in range(1, (headers)|length) %}
+    <button {% if num_rows == 1 %}hidden="hidden"{% endif %} type="button" onclick="drawChart{{i}}()">{{ headers[i] }} Bar Chart</button>
+    {% endfor %}
+
+{% else %}
+  <input class="submit" type="hidden" name="filename" value="{{ filename }}">
+  <button type="submit">Filter</button>
+{% endif %}
+      
+        
+      
+
+    </form>
+    {% for i in range(1, (headers)|length) %}
+    <div id="Barchart_div_{{i}}"></div>
+    {% endfor %}
+    {% for i in range(0, (headers)|length) %}
+    <div id="Piechart_div_{{ i }}"></div>
+    {% endfor %}
+    
+    <div id="table_div"></div>
+
+  </div>
+</body>
+{% endblock %}
